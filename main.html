@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>加密解密演示</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <style type="text/css">
+      .encrypt-box textarea, .encrypt-output-box textarea, .decrypt-box textarea, .decrypt-output-box textarea {
+        resize: none;
+      }
+      
+      .encrypt-box>.panel-body .row, .decrypt-box>.panel-body .row {
+        margin-bottom: 20px;
+      }
+      
+      textarea {
+        font-family: Consolas;
+      }
+      
+    </style>
+    <script src="https://code.jquery.com/jquery.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="mathjs-3.16.0/math.min.js"></script>
+    
+    <link href="CodeMirror-5.19.0/lib/codemirror.css" rel="stylesheet" >
+    <script src="CodeMirror-5.19.0/lib/codemirror.js"></script>
+    <link href="CodeMirror-5.19.0/theme/solarized.css" rel="stylesheet">
+    <script src="CodeMirror-5.19.0/mode/javascript/javascript.js"></script>
+
+    <script src="algorithm.js"></script>
+    <script type="text/javascript">
+    
+      // 日志函数
+      _encryptLogger = function(s) {
+        var ta = $("#encryptLog");
+        ta.val(ta.val() + s + "\n");
+        ta.scrollTop(ta[0].scrollHeight - ta.height());
+      };
+      
+      $(function() {
+        var i;
+        
+        var editors = {}
+        $('.codemirror-editor').each(function() {
+          editors[$(this).attr("data-editor-name")] = {
+            editor: CodeMirror.fromTextArea(this, {
+                lineNumbers: true,//是否显示行号
+                mode: "javascript",　//默认脚本编码
+                lineWrapping: true, //是否强制换行
+                theme: "solarized"
+            }),
+            logger: (function(self) {
+              return function(s) {
+                var ta = $($(self).attr("data-log"));
+                ta.val(ta.val() + s + "\n");
+                ta.scrollTop(ta[0].scrollHeight - ta.height());
+              };
+            })(this)
+          };
+        });
+        
+        $("#encryptSelectScriptBtn, #decryptSelectScriptBtn").click(function() {
+          // 点击选择算法按钮
+          $(this).next().empty();
+          var scripts = algorithm[$(this).attr("data-algorithm-array-name")];
+          
+          var i;
+          for(i = 0; i < scripts.length; i++) {
+            $(this).next().append(
+              $("<li><a>" + scripts[i].name + "</a></li>").click(function(thisidx, self) {
+                return function() {
+                  if(scripts[thisidx].type === "function") {
+                    // 脚本在源码中以代码呈现
+                    var funcstr = String(scripts[thisidx].value);
+                    funcstr = funcstr.replace(/(function)\s*(\()/, "$1 crypt$2");
+                    // 函数缺少名称
+                    editors[$(self).attr("data-target-editor")].editor.setValue(funcstr);
+                  } else if(scripts[thisidx].type === "string") {
+                    // 脚本在源码中以字符串呈现
+                    editors[$(self).attr("data-target-editor")].editor.setValue(scripts[thisidx].value);
+                  } else {
+                    console.log("错误: 未知脚本类型");
+                    throw new Exception("错误: 未知脚本类型");
+                  }
+                }
+              }(i, this)));
+          }
+        });
+        $("#encryptClearLogBtn, #decryptClearLogBtn").click(function() {
+          $($(this).attr("data-clear-target")).val("");
+        });
+        $("#encryptBtn, #decryptBtn").click(function() {
+          if($($(this).attr("data-clearlog-checkbox")).is(":checked")) {
+            $($(this).attr("data-log")).val("");
+          }
+          
+          var crypt, scriptoutput, script;
+          var editorobj = editors[$(this).attr("data-script-editor")];
+          var text = $($(this).attr("data-plaintext")).val();
+          var key = $($(this).attr("data-keytext")).val();
+          script = editorobj.editor.getValue();
+          try {
+            var f = (new Function("log", script + "; return crypt;"));
+          } catch(e) {
+            editorobj.logger("错误: 可能是语法有误.");
+            return;
+          };
+          try {
+            crypt = f(editorobj.logger);
+          } catch(e) {
+            editorobj.logger("错误: 找不到 crypt 函数.");
+            return;
+          }
+          try {
+            scriptoutput = crypt(text, key);
+          } catch(e) {
+            editorobj.logger("错误: 可能是语法有误.");
+            return;
+          }
+          if(scriptoutput === undefined) {
+            editorobj.logger("错误: crypt 函数没有返回值.");
+            return;
+          } else {
+            // 加密成功
+            $($(this).attr("data-output")).val(scriptoutput).parent().addClass("has-success");
+            setTimeout((function(self) {
+              return function() {
+                $($(self).attr("data-output")).val(scriptoutput).parent().removeClass("has-success");
+              }
+            })(this), 200);
+          }
+        });
+        $("#encryptCopyOutputBtn, #decryptCopyOutputBtn").click(function() {
+          var str = $($(this).attr("data-clipboard-target")).val();
+          var handler = function(event) {
+            event.clipboardData.setData('text/plain', str);
+            event.preventDefault();
+          }
+          document.addEventListener('copy', handler);
+          document.execCommand('copy');
+          document.removeEventListener('copy', handler);
+          $(this).addClass("btn-success");
+          setTimeout(function(self) {
+            return function() {
+              $(self).removeClass("btn-success");
+            }
+          }(this), 200);
+        });
+        
+        $("#encryptPlaintext, #encryptKeytext").bind("input", function() {
+          if($("#encryptRealtime").is(":checked")) {
+            $("#encryptBtn").click();
+          }
+        });
+        
+        $("#decryptPlaintext, #decryptKeytext").bind("input", function() {
+          if($("#decryptRealtime").is(":checked")) {
+            $("#decryptBtn").click();
+          }
+        });
+        
+        $(".copy-textarea").click(function() {
+          $($(this).attr("data-copy-dest")).val($($(this).attr("data-copy-src")).val());
+        });
+      });
+      
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>加密解密演示</h1>
+      
+      <div class="page-header">
+        <h1>加密</h1>
+      </div>
+      
+      <div class="panel panel-default encrypt-box form-group">
+        <div class="panel-heading">加密配置</div>
+        <div class="panel-body">
+          <div class="row">
+            <div class="col-xs-6">
+              <div class="row">
+                <div class="col-xs-12">
+                  <textarea name="encryptPlaintext" class="form-control" placeholder="原文" rows="7" id="encryptPlaintext"></textarea>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-xs-12">
+                  <textarea name="encryptKeytext" class="form-control" placeholder="密钥" rows="7" id="encryptKeytext"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="col-xs-6">
+            
+              <div class="btn-group">
+                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" id="encryptSelectScriptBtn" data-algorithm-array-name="usable_encrypt_scripts" data-target-editor="encrypt_editor">
+                  <span role="text">选择算法</span><span class="caret"></span></button>
+                <ul class="dropdown-menu">
+                </ul>
+              </div>
+              <textarea name="encryptScript" rows="10" class="form-control codemirror-editor" id="encryptScript" placeholder="加密算法" data-editor-name="encrypt_editor" data-log="#encryptLog"></textarea>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-xs-3">
+            </div>
+            <div class="col-xs-5">
+              <div class="btn btn-default btn-primary btn-block" id="encryptBtn" data-plaintext="#encryptPlaintext" data-keytext="#encryptKeytext" data-script-editor="encrypt_editor" data-clearlog-checkbox="#encryptRealtimeClearLog" data-output="#encryptOutput" data-log="#encryptLog">加密</div>
+            </div>
+            <div class="col-xs-2">
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" id="encryptRealtime">实时加密
+                </label>
+              </div>
+            </div>
+            <div class="col-xs-2">
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" id="encryptRealtimeClearLog">加密前清空日志
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+      
+      <div class="panel panel-default form-group encrypt-output-box">
+        <div class="panel-heading">
+          加密结果
+          <div class="btn-group btn-group-xs">
+            <button class="btn btn-default" id="encryptCopyOutputBtn" data-clipboard-target="#encryptOutput">
+              <span class="glyphicon glyphicon-edit"></span>
+              复制
+            </button>
+            <button class="btn btn-default" id="encryptClearLogBtn" data-clear-target="#encryptLog">
+              <span class="glyphicon glyphicon-erase"></span>
+              清空日志
+            </button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <div class="col-xs-8">
+              <textarea name="encrypt-result" id="encryptOutput" rows="10" class="form-control" placeholder="加密结果"></textarea>
+            </div>
+            <div class="col-xs-4">
+              <textarea name="encrypt-result" id="encryptLog" rows="10" class="form-control" placeholder="加密日志"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="page-header">
+        <h1>解密</h1>
+      </div>
+      
+      <div class="panel panel-default decrypt-box form-group">
+        <div class="panel-heading">
+          解密配置
+          <div class="btn-group btn-group-xs">
+            <div class="btn btn-default copy-textarea" data-copy-src="#encryptOutput" data-copy-dest="#decryptPlaintext">
+              <span class="glyphicon glyphicon-edit"></span>
+              复制加密结果到解密原文
+            </div>
+            <div class="btn btn-default copy-textarea" data-copy-src="#encryptKeytext" data-copy-dest="#decryptKeytext">
+              <span class="glyphicon glyphicon-edit"></span>
+              复制加密密钥到解密密钥
+            </div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <div class="col-xs-6">
+              <div class="row">
+                <div class="col-xs-12">
+                  <textarea name="decryptPlaintext" class="form-control" placeholder="原文" rows="7" id="decryptPlaintext"></textarea>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-xs-12">
+                  <textarea name="decryptKeytext" class="form-control" placeholder="密钥" rows="7" id="decryptKeytext"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="col-xs-6">
+            
+              <div class="btn-group">
+                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" id="decryptSelectScriptBtn" data-algorithm-array-name="usable_decrypt_scripts" data-target-editor="decrypt_editor">
+                  <span role="text">选择算法</span><span class="caret"></span></button>
+                <ul class="dropdown-menu">
+                </ul>
+              </div>
+              <textarea name="decryptScript" rows="10" class="form-control codemirror-editor" id="decryptScript" placeholder="解密算法" data-editor-name="decrypt_editor" data-log="#decryptLog"></textarea>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-xs-3">
+            </div>
+            <div class="col-xs-5">
+              <div class="btn btn-default btn-primary btn-block" id="decryptBtn" data-plaintext="#decryptPlaintext" data-keytext="#decryptKeytext" data-script-editor="decrypt_editor" data-clearlog-checkbox="#decryptRealtimeClearLog" data-output="#decryptOutput" data-log="#decryptLog">解密</div>
+            </div>
+            <div class="col-xs-2">
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" id="decryptRealtime">实时解密
+                </label>
+              </div>
+            </div>
+            <div class="col-xs-2">
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" id="decryptRealtimeClearLog">解密前清空日志
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+      
+      <div class="panel panel-default form-group decrypt-output-box">
+        <div class="panel-heading">
+          解密结果
+          <div class="btn-group">
+            <button class="btn btn-default btn-xs" id="decryptCopyOutputBtn" data-clipboard-target="#decryptOutput">
+              <span class="glyphicon glyphicon-edit"></span>
+              复制
+            </button>
+            <button class="btn btn-default btn-xs" id="decryptClearLogBtn" data-clear-target="#decryptLog">
+              <span class="glyphicon glyphicon-erase"></span>
+              清空日志
+            </button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <div class="col-xs-8">
+              <textarea name="decrypt-result" id="decryptOutput" rows="10" class="form-control" placeholder="解密结果"></textarea>
+            </div>
+            <div class="col-xs-4">
+              <textarea name="decrypt-result" id="decryptLog" rows="10" class="form-control" placeholder="解密日志"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </body>
+</html>
