@@ -35,11 +35,11 @@ function(text, key) {
     "value":
 function(text, key) {
   function movealpha(c, d) {
-    c = c.charCodeAt();
-    if(c > 64 && c < 91) {
-      return String.fromCharCode((c - 65 + d) % 26 + 65);
-    } else if(c > 96 && c < 123) {
-      return String.fromCharCode((c - 97 + d) % 26 + 97);
+    var i = c.charCodeAt();
+    if(i > 64 && i < 91) {
+      return String.fromCharCode((i - 65 + d) % 26 + 65);
+    } else if(i > 96 && i < 123) {
+      return String.fromCharCode((i - 97 + d) % 26 + 97);
     } else {
       return c;
     }
