@@ -48,7 +48,32 @@ function(text, key) {
   var i;
   var outs = new Array("");
   for(i = 0; i < text.length; i++) {
-    outs.push(movealpha(text[i], Number(key)));
+    outs.push(movealpha(text[i], math.mod(Number(key), 26)));
+  }
+  return outs.join("");
+}
+  },
+  "Caesar解密": {
+    "name": "Caesar解密",
+    "type": "function",
+    "value":
+function(text, key) {
+  function movealpha(c, d) {
+    var i = c.charCodeAt();
+    if(i > 64 && i < 91) {
+      return String.fromCharCode((i - 65 + d) % 26 + 65);
+    } else if(i > 96 && i < 123) {
+      return String.fromCharCode((i - 97 + d) % 26 + 97);
+    } else {
+      return c;
+    }
+  }
+
+  var i;
+  keynum = Number(key);
+  var outs = new Array("");
+  for(i = 0; i < text.length; i++) {
+    outs.push(movealpha(text[i], math.mod(26 - Number(key), 26)));
   }
   return outs.join("");
 }
@@ -336,17 +361,282 @@ function(text, key) {
   }
   return out.join('');
 }
+  },
+  "Hill加密": {
+    "name": "Hill加密",
+    "type": "function",
+    "value":
+function crypt(text, key) {
+  function isalpha(c) {
+    if(/^[a-z]$/.test(c)) {
+      return 2;
+    } else if(/^[A-Z]$/.test(c)) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  function ord2alpha(c, islow) {
+    var base = 65;
+    if(islow === true) { base = 97; }
+    if(c >= 0 && c < 26) {
+      return String.fromCharCode(base + c);
+    }
+    return '*';
+  }
+
+  function alpha2ord(c) {
+    c = c.toUpperCase()
+    if(/^[A-Z]$/.test(c)) {
+      return c.charCodeAt() - 65;
+    } else {
+      return -1;
+    }
+  }
+
+  function checksquaremat(arrs) {
+    var i;
+    try {
+      if(arrs.length <= 1) {
+        return false;
+      }
+      for(i = 0; i < arrs.length; i++) {
+        if(!Array.isArray(arrs[i]) || arrs[i].length !== arrs.length) {
+          return false;
+        }
+      }
+    } catch(e) {
+      return false;
+    }
+    return true;
+  }
+
+  function getinvmat(keymat) {
+    var det = math.mod(math.det(keymat), 26);
+    var times_map = {
+      1: 1, 3: 9, 5: 21, 7: 15, 9: 3, 11: 19, 15: 7, 17: 23,
+      19: 11, 21: 5, 23: 17, 25: 25
+    };
+    if(!(det in times_map)) {
+      log('警告: 该矩阵不可逆');
+      return;
+    }
+    log('det: ' + det + ', times: ' + times_map[det]);
+    return math.round(math.mod(math.multiply(math.inv(keymat), math.det(keymat) * times_map[det]), 26));
+  }
+
+  function core(keymat, datvec) {
+    while(datvec.length < keymat.valueOf().length) {
+      datvec.push('x');
+    }
+    var uplow = [];
+    var i;
+    for(i = 0; i < datvec.length; i++) {
+      uplow.push(isalpha(datvec[i]));
+      datvec[i] = alpha2ord(datvec[i]);
+    }
+    var out = math.mod(math.multiply(keymat, datvec).valueOf(), 26);
+    for(i = 0; i < out.length; i++) {
+      out[i] = ord2alpha(out[i], uplow[i] === 2);
+    }
+    return out;
+  }
+  
+  var i, j;
+  
+  var keyarrs = JSON.parse(key);
+  if(!checksquaremat(keyarrs)) {
+    log('错误: 矩阵不是方阵');
+    return '';
+  }
+  var keymat = math.matrix(keyarrs);
+  
+  var out = text.split('');
+  var group_idx = [];
+  var group_dat;
+  var cipher;
+  for(i = 0; i < out.length; i++) {
+    if(isalpha(out[i])) {
+      group_idx.push(i);
+      if(group_idx.length === keyarrs.length) {
+        group_dat = [];
+        for(j = 0; j < group_idx.length; j++) {
+          group_dat.push(out[group_idx[j]]);
+        }
+        cipher = core(keymat, group_dat).valueOf();
+        log(group_dat + ' -> ' + cipher);
+        for(j = 0; j < group_idx.length; j++) {
+          out[group_idx[j]] = cipher[j];
+        }
+        group_idx = [];
+      }
+    }
+  }
+  
+  if(group_idx.length > 0) {
+    group_dat = [];
+    for(j = 0; j < group_idx.length; j++) {
+      group_dat.push(out[group_idx[j]]);
+    }
+    cipher = core(keymat, group_dat).valueOf();
+    log(group_dat + ' -> ' + cipher);
+    for(j = 0; j < group_idx.length; j++) {
+      out[group_idx[j]] = cipher[j];
+    }
+    out.splice.apply(out, [group_idx[group_idx.length - 1] + 1, 0].concat(cipher.slice(group_idx.length)));
+  }
+  var dekeymat = getinvmat(keymat);
+  log('特征值: ' + math.det(keymat));
+  log('逆矩阵: ' + JSON.stringify(dekeymat.valueOf()));
+  return out.join('');
+}
+  },
+  "Hill解密": {
+    "name": "Hill解密",
+    "type": "function",
+    "value":
+function crypt(text, key) {
+  function isalpha(c) {
+    if(/^[a-z]$/.test(c)) {
+      return 2;
+    } else if(/^[A-Z]$/.test(c)) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  function ord2alpha(c, islow) {
+    var base = 65;
+    if(islow === true) { base = 97; }
+    if(c >= 0 && c < 26) {
+      return String.fromCharCode(base + c);
+    }
+    return '*';
+  }
+
+  function alpha2ord(c) {
+    c = c.toUpperCase()
+    if(/^[A-Z]$/.test(c)) {
+      return c.charCodeAt() - 65;
+    } else {
+      return -1;
+    }
+  }
+
+  function checksquaremat(arrs) {
+    var i;
+    try {
+      if(arrs.length <= 1) {
+        return false;
+      }
+      for(i = 0; i < arrs.length; i++) {
+        if(!Array.isArray(arrs[i]) || arrs[i].length !== arrs.length) {
+          return false;
+        }
+      }
+    } catch(e) {
+      return false;
+    }
+    return true;
+  }
+
+  function getinvmat(keymat) {
+    var det = math.mod(math.det(keymat), 26);
+    var times_map = {
+      1: 1, 3: 9, 5: 21, 7: 15, 9: 3, 11: 19, 15: 7, 17: 23,
+      19: 11, 21: 5, 23: 17, 25: 25
+    };
+    if(!(det in times_map)) {
+      log('错误: 该矩阵不可逆');
+      return;
+    }
+    log('det: ' + det + ', times: ' + times_map[det]);
+    return math.round(math.mod(math.multiply(math.inv(keymat), math.det(keymat) * times_map[det]), 26));
+  }
+
+  function core(keymat, datvec) {
+    while(datvec.length < keymat.valueOf().length) {
+      datvec.push('x');
+    }
+    var uplow = [];
+    var i;
+    for(i = 0; i < datvec.length; i++) {
+      uplow.push(isalpha(datvec[i]));
+      datvec[i] = alpha2ord(datvec[i]);
+    }
+    var out = math.mod(math.multiply(keymat, datvec).valueOf(), 26);
+    for(i = 0; i < out.length; i++) {
+      out[i] = ord2alpha(out[i], uplow[i] === 2);
+    }
+    return out;
+  }
+  
+  var i, j;
+  
+  var keyarrs = JSON.parse(key);
+  if(!checksquaremat(keyarrs)) {
+    log('错误: 矩阵不是方阵');
+    return '';
+  }
+  var keymat = math.matrix(keyarrs);
+  var dekeymat = getinvmat(keymat);
+  if(dekeymat === undefined) {
+    return;
+  }
+  log('特征值: ' + math.det(keymat));
+  log('逆矩阵: ' + JSON.stringify(dekeymat.valueOf()));
+  keymat = dekeymat;
+  
+  var out = text.split('');
+  var group_idx = [];
+  var group_dat;
+  var cipher;
+  for(i = 0; i < out.length; i++) {
+    if(isalpha(out[i])) {
+      group_idx.push(i);
+      if(group_idx.length === keyarrs.length) {
+        group_dat = [];
+        for(j = 0; j < group_idx.length; j++) {
+          group_dat.push(out[group_idx[j]]);
+        }
+        cipher = core(keymat, group_dat).valueOf();
+        log(group_dat + ' -> ' + cipher);
+        for(j = 0; j < group_idx.length; j++) {
+          out[group_idx[j]] = cipher[j];
+        }
+        group_idx = [];
+      }
+    }
+  }
+  
+  if(group_idx.length > 0) {
+    group_dat = [];
+    for(j = 0; j < group_idx.length; j++) {
+      group_dat.push(out[group_idx[j]]);
+    }
+    cipher = core(keymat, group_dat).valueOf();
+    log(group_dat + ' -> ' + cipher);
+    for(j = 0; j < group_idx.length; j++) {
+      out[group_idx[j]] = cipher[j];
+    }
+    out.splice.apply(out, [group_idx[group_idx.length - 1] + 1, 0].concat(cipher.slice(group_idx.length)));
+  }
+  var outstr = out.join('');
+  return outstr.replace(/[xX]{1,2}([^a-zA-Z]*)$/, "$1");
+}
   }
 };
 
 // 可用的加密算法的列表
 var usable_encrypt_scripts = [
-  scripts["默认1"], scripts["Caesar加密"], scripts["Playfair加密"], scripts['ASCII XOR加密']
+  scripts["默认1"], scripts["Caesar加密"], scripts["Playfair加密"], scripts['ASCII XOR加密'], scripts["Hill加密"]
 ]
 
 // 可用的解密算法的列表
 var usable_decrypt_scripts = [
-  scripts["默认2"], scripts["Caesar加密"], scripts["Playfair解密"], scripts["ASCII XOR解密"]
+  scripts["默认2"], scripts["Caesar解密"], scripts["Playfair解密"], scripts["ASCII XOR解密"], scripts["Hill解密"]
 ]
 
 // 根对象
