@@ -34,22 +34,14 @@ function(text, key) {
     "type": "function",
     "value":
 function(text, key) {
-  function movealpha(c, d) {
-    var i = c.charCodeAt();
-    if(i > 64 && i < 91) {
-      return String.fromCharCode((i - 65 + d) % 26 + 65);
-    } else if(i > 96 && i < 123) {
-      return String.fromCharCode((i - 97 + d) % 26 + 97);
-    } else {
-      return c;
+  var outs = text.split('');
+  outs.forEach(function(v, i, a) {
+    function movealpha(c, d) {
+      var i = c.charCodeAt();
+      return /^[A-Z]$/.test(c) ? String.fromCharCode((i - 65 + d) % 26 + 65) : /^[a-z]$/.test(c) ? String.fromCharCode((i - 97 + d) % 26 + 97) : c;
     }
-  }
-
-  var i;
-  var outs = new Array("");
-  for(i = 0; i < text.length; i++) {
-    outs.push(movealpha(text[i], math.mod(Number(key), 26)));
-  }
+    a[i] = movealpha(v, math.mod(Number(key), 26));
+  });
   return outs.join("");
 }
   },
@@ -58,23 +50,14 @@ function(text, key) {
     "type": "function",
     "value":
 function(text, key) {
-  function movealpha(c, d) {
-    var i = c.charCodeAt();
-    if(i > 64 && i < 91) {
-      return String.fromCharCode((i - 65 + d) % 26 + 65);
-    } else if(i > 96 && i < 123) {
-      return String.fromCharCode((i - 97 + d) % 26 + 97);
-    } else {
-      return c;
+  var outs = text.split('');
+  outs.forEach(function(v, i, a) {
+    function movealpha(c, d) {
+      var i = c.charCodeAt();
+      return /^[A-Z]$/.test(c) ? String.fromCharCode((i - 65 + d) % 26 + 65) : /^[a-z]$/.test(c) ? String.fromCharCode((i - 97 + d) % 26 + 97) : c;
     }
-  }
-
-  var i;
-  keynum = Number(key);
-  var outs = new Array("");
-  for(i = 0; i < text.length; i++) {
-    outs.push(movealpha(text[i], math.mod(26 - Number(key), 26)));
-  }
+    a[i] = movealpha(v, math.mod(26 - Number(key), 26));
+  });
   return outs.join("");
 }
   },
@@ -82,8 +65,7 @@ function(text, key) {
     "name": "Playfair加密",
     "type": "function",
     "value":
-function crypt(text, key) {
-  key = key.toUpperCase();
+function(text, key) {
   var i;
   
   // 原文中不要有多个k连写
@@ -93,17 +75,13 @@ function crypt(text, key) {
   
   // 生成密钥矩阵
   var K = [];
-  for(i = 0; i < key.length; i++) {
-    if(K.indexOf(key[i]) === -1 && /^[A-Z]$/.test(key[i])) {
-    	K.push(key[i]);
+  var Kpushfunc = function(v) {
+    if(K.indexOf(v) === -1 && /^[A-Z]$/.test(v)) {
+      K.push(v);
     }
-  }
-  var alphabeta = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  for(i = 0; i < alphabeta.length; i++) {
-    if(K.indexOf(alphabeta[i]) === -1) {
-      K.push(alphabeta[i]);
-    }
-  }
+  };
+  key.toUpperCase().split('').forEach(Kpushfunc);
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(Kpushfunc);
   log(K.slice(0, 5));
   log(K.slice(5, 10));
   log(K.slice(10, 15));
@@ -112,20 +90,18 @@ function crypt(text, key) {
   
   // 字母组加密
   function encrypt_core(a1, a2) {
-    A1 = a1.toUpperCase();
-    A2 = a2.toUpperCase();
-    var i1 = K.indexOf(A1);
-    var i2 = K.indexOf(A2);
-    if(i1 == 25) i1 = Math.floor(Math.random() * 25);
-    if(i2 == 25) i2 = Math.floor(Math.random() * 25);
-    var tmp;
+    var i1 = K.indexOf(a1.toUpperCase());
+    var i2 = K.indexOf(a2.toUpperCase());
     if(i1 == -1 || i2 == -1 || i1 == i2) {
       throw '参数有误';
     }
-    i1x = i1 % 5;
-    i2x = i2 % 5;
-    i1y = Math.floor(i1 / 5);
-    i2y = Math.floor(i2 / 5);
+    if(i1 == 25) i1 = Math.floor(Math.random() * 25);
+    if(i2 == 25) i2 = Math.floor(Math.random() * 25);
+    if(i1 == i2) i1 = (i2 + 1) % 25;
+    var i1x = i1 % 5;
+    var i2x = i2 % 5;
+    var i1y = Math.floor(i1 / 5);
+    var i2y = Math.floor(i2 / 5);
     if(i1x == i2x) {
       i1y = (i1y + 1) % 5;
       i2y = (i2y + 1) % 5;
@@ -133,20 +109,11 @@ function crypt(text, key) {
       i1x = (i1x + 1) % 5;
       i2x = (i2x + 1) % 5;
     } else {
-      tmp = i1x;
-      i1x = i2x;
-      i2x = tmp;
+      [i1x, i2x] = [i2x, i1x];
     }
-    o1 = K[i1y * 5 + i1x];
-    o2 = K[i2y * 5 + i2x];
-    if(a1 >= 'a') {
-      // 为小写
-      o1 = o1.toLowerCase();
-    }
-    if(a2 >= 'a') {
-      o2 = o2.toLowerCase();
-    }
-    return o1 + o2;
+    var o1 = K[i1y * 5 + i1x];
+    var o2 = K[i2y * 5 + i2x];
+    return (a1 >= 'a' ? o1.toLowerCase() : o1) + (a2 >= 'a' ? o2.toLowerCase() : o2);
   }
   
   // 字母分组
@@ -197,44 +164,36 @@ function crypt(text, key) {
     "type": "function",
     "value":
 function(text, key) {
-  key = key.toUpperCase();
   var i;
   
   // 生成密钥矩阵
   var K = [];
-  for(i = 0; i < key.length; i++) {
-    if(K.indexOf(key[i]) === -1 && /^[A-Z]$/.test(key[i])) {
-    	K.push(key[i]);
+  var Kpushfunc = function(v) {
+    if(K.indexOf(v) === -1 && /^[A-Z]$/.test(v)) {
+      K.push(v);
     }
-  }
-  var alphabeta = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  for(i = 0; i < alphabeta.length; i++) {
-    if(K.indexOf(alphabeta[i]) === -1) {
-      K.push(alphabeta[i]);
-    }
-  }
-  // log(K.slice(0, 5));
-  // log(K.slice(5, 10));
-  // log(K.slice(10, 15));
-  // log(K.slice(15, 20));
-  // log(K.slice(20, 25));
+  };
+  key.toUpperCase().split('').forEach(Kpushfunc);
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(Kpushfunc);
+  log(K.slice(0, 5));
+  log(K.slice(5, 10));
+  log(K.slice(10, 15));
+  log(K.slice(15, 20));
+  log(K.slice(20, 25));
   
   // 字母组解密
   function encrypt_core(a1, a2) {
-    A1 = a1.toUpperCase();
-    A2 = a2.toUpperCase();
-    var i1 = K.indexOf(A1);
-    var i2 = K.indexOf(A2);
+    var i1 = K.indexOf(a1.toUpperCase());
+    var i2 = K.indexOf(a2.toUpperCase());
     if(i1 == 25) i1 = Math.floor(Math.random() * 25);
     if(i2 == 25) i2 = Math.floor(Math.random() * 25);
-    var tmp;
     if(i1 == -1 || i2 == -1 || i1 == i2) {
       throw '参数有误';
     }
-    i1x = i1 % 5;
-    i2x = i2 % 5;
-    i1y = Math.floor(i1 / 5);
-    i2y = Math.floor(i2 / 5);
+    var i1x = i1 % 5;
+    var i2x = i2 % 5;
+    var i1y = Math.floor(i1 / 5);
+    var i2y = Math.floor(i2 / 5);
     if(i1x == i2x) {
       i1y = (i1y + 4) % 5;
       i2y = (i2y + 4) % 5;
@@ -242,20 +201,11 @@ function(text, key) {
       i1x = (i1x + 4) % 5;
       i2x = (i2x + 4) % 5;
     } else {
-      tmp = i1x;
-      i1x = i2x;
-      i2x = tmp;
+      [i1x, i2x] = [i2x, i1x];
     }
-    o1 = K[i1y * 5 + i1x];
-    o2 = K[i2y * 5 + i2x];
-    if(a1 >= 'a') {
-      // 为小写
-      o1 = o1.toLowerCase();
-    }
-    if(a2 >= 'a') {
-      o2 = o2.toLowerCase();
-    }
-    return o1 + o2;
+    var o1 = K[i1y * 5 + i1x];
+    var o2 = K[i2y * 5 + i2x];
+    return (a1 >= 'a' ? o1.toLowerCase() : o1) + (a2 >= 'a' ? o2.toLowerCase() : o2);
   }
   
   // 字母分组
@@ -280,7 +230,7 @@ function(text, key) {
         
         //log(T[prevprevalpha1idx] + ", " + T[prevprevalpha2idx]);
         
-        if(prevprevalpha2idx != -1 && T[prevprevalpha1idx] === retalpha[0]) {
+        if(prevprevalpha2idx != -1 && T[prevprevalpha1idx] === retalpha[0] && T[prevprevalpha2idx] === 'k') {
           // 除去相同字母中插入的k
           T.splice(prevprevalpha2idx, 1);
           prevalphaidx--;
@@ -312,29 +262,19 @@ function(text, key) {
     "type": "function",
     "value":
 function(text, key) {
-  
-  // 暂不支持中文
-  
-  var textidx, keyidx;
-  var out = [];
-  
-  function toHex(n) {
-    var s = n.toString(16).toUpperCase();
-    if(s.length == 1) {
-      s = "0" + s;
+  text = unescape(encodeURIComponent(text));
+  key = unescape(encodeURIComponent(key));
+  var keyidx = 0;
+  text = text.split('');
+  text.forEach(function(v, i, a) {
+    function toHex(n) {
+      var s = n.toString(16).toUpperCase();
+      return s.length === 1 ? '0' + s : s;
     }
-    return s;
-  }
-  
-  for(textidx = 0, keyidx = 0; textidx < text.length; textidx++, keyidx++) {
-    if(keyidx == key.length) {
-      keyidx = 0;
-    }
-    // log(text[textidx].charCodeAt() + " ^ " + key[keyidx].charCodeAt() + " = " + (text[textidx].charCodeAt() ^ key[keyidx].charCodeAt()));
-    out.push(toHex(text[textidx].charCodeAt() ^ key[keyidx].charCodeAt()));
-  }
-  
-  return out.join('');
+    a[i] = toHex(v.charCodeAt() ^ key[keyidx].charCodeAt());
+    keyidx = (keyidx + 1) % key.length;
+  });
+  return text.join('');
 }
   },
   "ASCII XOR解密": {
@@ -342,57 +282,31 @@ function(text, key) {
     "type": "function",
     "value":
 function(text, key) {
-  
-  // 注释掉日志函数可以提高速度
-  
-  var textidx;
-  var keyidx;
-  var substr;
-  var num;
-  var out = [];
-  for(textidx = 0, keyidx = 0; textidx < text.length; textidx += 2, keyidx++) {
-    if(keyidx == key.length) {
-      keyidx = 0;
-    }
-    substr = text.substr(textidx, 2);
-    num = parseInt(substr, 16);
-    log(num + " ^ " + key[keyidx].charCodeAt() + " = " + (num ^ key[keyidx].charCodeAt()));
-    out.push(String.fromCharCode(num ^ key[keyidx].charCodeAt()));
-  }
-  return out.join('');
+  key = unescape(encodeURIComponent(key));
+  var keyidx = 0;
+  text = text.match(/\w\w/g);
+  text.forEach(function(v, i, a) {
+    a[i] = String.fromCharCode(parseInt(v, 16) ^ key[keyidx].charCodeAt());
+    keyidx = (keyidx + 1) % key.length;
+  });
+  return decodeURIComponent(escape(text.join('')));
 }
   },
   "Hill加密": {
     "name": "Hill加密",
     "type": "function",
     "value":
-function crypt(text, key) {
+function(text, key) {
   function isalpha(c) {
-    if(/^[a-z]$/.test(c)) {
-      return 2;
-    } else if(/^[A-Z]$/.test(c)) {
-      return 1;
-    } else {
-      return 0;
-    }
+    return /^[a-z]$/.test(c) ? 2 : /^[A-Z]$/.test(c) ? 1 : 0;
   }
 
   function ord2alpha(c, islow) {
-    var base = 65;
-    if(islow === true) { base = 97; }
-    if(c >= 0 && c < 26) {
-      return String.fromCharCode(base + c);
-    }
-    return '*';
+    return (c >= 0 && c < 26) ? String.fromCharCode((islow ? 97 : 65) + c) : '*';
   }
 
   function alpha2ord(c) {
-    c = c.toUpperCase()
-    if(/^[A-Z]$/.test(c)) {
-      return c.charCodeAt() - 65;
-    } else {
-      return -1;
-    }
+    return (/^[A-Z]$/i.test(c)) ? c.toUpperCase().charCodeAt() - 65 : -1;
   }
 
   function checksquaremat(arrs) {
@@ -414,10 +328,7 @@ function crypt(text, key) {
 
   function getinvmat(keymat) {
     var det = math.mod(math.det(keymat), 26);
-    var times_map = {
-      1: 1, 3: 9, 5: 21, 7: 15, 9: 3, 11: 19, 15: 7, 17: 23,
-      19: 11, 21: 5, 23: 17, 25: 25
-    };
+    var times_map = { 1: 1, 3: 9, 5: 21, 7: 15, 9: 3, 11: 19, 15: 7, 17: 23, 19: 11, 21: 5, 23: 17, 25: 25 };
     if(!(det in times_map)) {
       log('警告: 该矩阵不可逆');
       return;
@@ -496,35 +407,19 @@ function crypt(text, key) {
     "name": "Hill解密",
     "type": "function",
     "value":
-function crypt(text, key) {
+function(text, key) {
   function isalpha(c) {
-    if(/^[a-z]$/.test(c)) {
-      return 2;
-    } else if(/^[A-Z]$/.test(c)) {
-      return 1;
-    } else {
-      return 0;
-    }
+    return /^[a-z]$/.test(c) ? 2 : /^[A-Z]$/.test(c) ? 1 : 0;
   }
 
   function ord2alpha(c, islow) {
-    var base = 65;
-    if(islow === true) { base = 97; }
-    if(c >= 0 && c < 26) {
-      return String.fromCharCode(base + c);
-    }
-    return '*';
+    return (c >= 0 && c < 26) ? String.fromCharCode((islow ? 97 : 65) + c) : '*';
   }
 
   function alpha2ord(c) {
-    c = c.toUpperCase()
-    if(/^[A-Z]$/.test(c)) {
-      return c.charCodeAt() - 65;
-    } else {
-      return -1;
-    }
+    return (/^[A-Z]$/i.test(c)) ? c.toUpperCase().charCodeAt() - 65 : -1;
   }
-
+  
   function checksquaremat(arrs) {
     var i;
     try {
@@ -624,19 +519,46 @@ function crypt(text, key) {
     out.splice.apply(out, [group_idx[group_idx.length - 1] + 1, 0].concat(cipher.slice(group_idx.length)));
   }
   var outstr = out.join('');
-  return outstr.replace(/[xX]{1,2}([^a-zA-Z]*)$/, "$1");
+  return outstr.replace(/[xX]+([^a-zA-Z]*)$/, "$1");
+}
+  },
+  "DES加密(调库)": {
+    "name": "DES加密(调库)",
+    "type": "function",
+    "value":
+function(text, key) {
+  // 密钥必须为 8/16/32 字节(utf-8)
+  return CryptoJS.DES.encrypt(
+    text,
+    CryptoJS.enc.Utf8.parse(key), {
+      mode: CryptoJS.mode.ECB,
+      padding: CryptoJS.pad.Pkcs7
+    }).toString();
+}
+  },
+  "DES解密(调库)": {
+    "name": "DES解密(调库)",
+    "type": "function",
+    "value":
+function(text, key) {
+  return CryptoJS.DES.decrypt(
+    text,
+    CryptoJS.enc.Utf8.parse(key), {
+      mode: CryptoJS.mode.ECB,
+      padding: CryptoJS.pad.Pkcs7
+    }).toString(CryptoJS.enc.Utf8);
 }
   }
 };
 
 // 可用的加密算法的列表
 var usable_encrypt_scripts = [
-  scripts["默认1"], scripts["Caesar加密"], scripts["Playfair加密"], scripts['ASCII XOR加密'], scripts["Hill加密"]
+  scripts["默认1"], scripts["Caesar加密"], scripts["Playfair加密"], scripts['ASCII XOR加密'], scripts["Hill加密"], scripts["DES加密(调库)"]
 ]
 
 // 可用的解密算法的列表
 var usable_decrypt_scripts = [
-  scripts["默认2"], scripts["Caesar解密"], scripts["Playfair解密"], scripts["ASCII XOR解密"], scripts["Hill解密"]
+  scripts["默认2"], scripts["Caesar解密"], scripts["Playfair解密"], scripts["ASCII XOR解密"], scripts["Hill解密"], scripts["DES解密(调库)"]
 ]
 
 // 根对象
